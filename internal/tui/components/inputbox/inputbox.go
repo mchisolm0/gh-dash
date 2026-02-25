@@ -20,21 +20,7 @@ type Model struct {
 	prompt       string
 	autocomplete *autocomplete.Model
 
-	// ContextExtractor extracts the "current context" (e.g., partial label being typed, @mention)
-	// at the given cursor position in the input.
-	// Returns: context string, start position (rune index), end position (rune index)
-	// Used for filtering autocomplete suggestions.
-	ContextExtractor func(input string, cursorPos int) (context string, start int, end int)
-
-	// SuggestionInserter handles inserting a selected autocomplete suggestion into the input.
-	// Receives: current input, selected suggestion, context start position, context end position
-	// Returns: new input string, new cursor position (rune index)
-	SuggestionInserter func(input string, suggestion string, contextStart int, contextEnd int) (newInput string, newCursorPos int)
-
-	// ItemsToExclude returns items to exclude from autocomplete suggestions based on current input.
-	// Receives: current input, context start position, context end position
-	// Returns: list of items to exclude from suggestions
-	ItemsToExclude func(input string, cursorPos int) []string
+	Autocompleter autocomplete.Autocompleter
 }
 
 var inputKeys = []key.Binding{
@@ -88,13 +74,12 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			m.autocomplete.Unsuppress()
 			currentValue := m.textArea.Value()
 			cursorPos := m.CursorPosition()
-			var currentContext string
+			currentContext := ""
 			var excludedItems []string
-			if m.ContextExtractor != nil {
-				currentContext, _, _ = m.ContextExtractor(currentValue, cursorPos)
-			}
-			if m.ItemsToExclude != nil {
-				excludedItems = m.ItemsToExclude(currentValue, cursorPos)
+			if m.Autocompleter != nil {
+				context := m.Autocompleter.ExtractContext(currentValue, cursorPos)
+				currentContext = context.Content
+				excludedItems = m.Autocompleter.ItemsToExclude(currentValue, cursorPos)
 			}
 			m.autocomplete.Show(currentContext, excludedItems)
 			return m, nil
@@ -111,20 +96,18 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				return m, nil
 			case key.Matches(msg, autocomplete.SelectKey):
 				selected := m.autocomplete.Selected()
-				if selected.Value != "" && m.ContextExtractor != nil && m.SuggestionInserter != nil {
+				if selected.Value != "" && m.Autocompleter != nil {
 					currentValue := m.textArea.Value()
 					cursorPos := m.CursorPosition()
-					_, contextStart, contextEnd := m.ContextExtractor(currentValue, cursorPos)
-					newValue, newCursorPos := m.SuggestionInserter(currentValue, selected.Value, contextStart, contextEnd)
+					context := m.Autocompleter.ExtractContext(currentValue, cursorPos)
+					newValue, newCursorPos := m.Autocompleter.InsertSuggestion(currentValue, selected.Value, context.Start, context.End)
 					m.textArea.SetValue(newValue)
 					m.textArea.SetCursor(newCursorPos)
 					// Refresh autocomplete to exclude the newly-added item
-					if m.ItemsToExclude != nil {
-						newCursorPos := m.CursorPosition()
-						newContext, _, _ := m.ContextExtractor(newValue, newCursorPos)
-						excludedItems := m.ItemsToExclude(newValue, newCursorPos)
-						m.autocomplete.Show(newContext, excludedItems)
-					}
+					newCursorPos = m.CursorPosition()
+					newContext := m.Autocompleter.ExtractContext(newValue, newCursorPos)
+					excludedItems := m.Autocompleter.ItemsToExclude(newValue, newCursorPos)
+					m.autocomplete.Show(newContext.Content, excludedItems)
 				}
 				return m, nil
 			}

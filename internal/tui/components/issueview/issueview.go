@@ -15,6 +15,7 @@ import (
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/common"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/autocomplete"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/inputbox"
+	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/inputbox/strategies"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/issuerow"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/constants"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/context"
@@ -97,8 +98,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, *IssueAction) {
 		m.ac.SetSuggestions(labelSuggestions(msg.Labels))
 		if m.isLabeling {
 			cursorPos := m.inputBox.CursorPosition()
-			currentLabel, _, _ := autocomplete.LabelContextExtractor(m.inputBox.Value(), cursorPos)
-			existingLabels := autocomplete.LabelItemsToExclude(m.inputBox.Value(), cursorPos)
+			currentLabel, _, _ := strategies.LabelContextExtractor(m.inputBox.Value(), cursorPos)
+			existingLabels := strategies.LabelItemsToExclude(m.inputBox.Value(), cursorPos)
 			m.ac.Show(currentLabel, existingLabels)
 		}
 		return m, clearCmd, nil
@@ -113,14 +114,14 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, *IssueAction) {
 		m.ac.SetSuggestions(userSuggestions(msg.Users))
 		if m.isCommenting {
 			cursorPos := m.inputBox.CursorPosition()
-			mention, _, _ := autocomplete.UserMentionContextExtractor(m.inputBox.Value(), cursorPos)
+			mention, _, _ := strategies.UserMentionContextExtractor(m.inputBox.Value(), cursorPos)
 			if mention != "" {
 				m.ac.Show(mention, nil)
 			}
 		} else if m.isAssigning {
 			cursorPos := m.inputBox.CursorPosition()
-			word, _, _ := autocomplete.WhitespaceContextExtractor(m.inputBox.Value(), cursorPos)
-			existingWords := autocomplete.WhitespaceItemsToExclude(m.inputBox.Value(), cursorPos)
+			word, _, _ := strategies.WhitespaceContextExtractor(m.inputBox.Value(), cursorPos)
+			existingWords := strategies.WhitespaceItemsToExclude(m.inputBox.Value(), cursorPos)
 			m.ac.Show(word, existingWords)
 		}
 		return m, clearCmd, nil
@@ -188,7 +189,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, *IssueAction) {
 			// Track @-mention context before and after the keystroke
 			previousCursorPos := m.inputBox.CursorPosition()
 			previousValue := m.inputBox.Value()
-			previousMention, _, _ := autocomplete.UserMentionContextExtractor(previousValue, previousCursorPos)
+			previousMention, _, _ := strategies.UserMentionContextExtractor(previousValue, previousCursorPos)
 
 			m.inputBox, taCmd = m.inputBox.Update(msg)
 			cmds = append(cmds, cmd, taCmd)
@@ -196,12 +197,12 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, *IssueAction) {
 			// Check for @-mention context change after the keystroke
 			currentCursorPos := m.inputBox.CursorPosition()
 			currentValue := m.inputBox.Value()
-			currentMention, _, _ := autocomplete.UserMentionContextExtractor(currentValue, currentCursorPos)
+			currentMention, _, _ := strategies.UserMentionContextExtractor(currentValue, currentCursorPos)
 
 			if currentMention != previousMention {
 				if currentMention != "" {
 					// User is typing an @-mention, show autocomplete
-					existingUsers := autocomplete.UserMentionItemsToExclude(currentValue, currentCursorPos)
+					existingUsers := strategies.UserMentionItemsToExclude(currentValue, currentCursorPos)
 					m.ac.Show(currentMention, existingUsers)
 				} else {
 					// No longer in an @-mention context
@@ -211,7 +212,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, *IssueAction) {
 		} else if m.isLabeling {
 			switch msg.Type {
 			case tea.KeyCtrlD:
-				labels := autocomplete.CurrentLabels(m.inputBox.Value())
+				labels := strategies.CurrentLabels(m.inputBox.Value())
 				if len(labels) > 0 {
 					cmd = m.label(labels)
 				}
@@ -237,17 +238,17 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, *IssueAction) {
 
 			previousCursorPos := m.inputBox.CursorPosition()
 			previousValue := m.inputBox.Value()
-			previousLabel, _, _ := autocomplete.LabelContextExtractor(previousValue, previousCursorPos)
+			previousLabel, _, _ := strategies.LabelContextExtractor(previousValue, previousCursorPos)
 
 			m.inputBox, taCmd = m.inputBox.Update(msg)
 			cmds = append(cmds, cmd, taCmd)
 
 			currentCursorPos := m.inputBox.CursorPosition()
 			currentValue := m.inputBox.Value()
-			currentLabel, _, _ := autocomplete.LabelContextExtractor(currentValue, currentCursorPos)
+			currentLabel, _, _ := strategies.LabelContextExtractor(currentValue, currentCursorPos)
 
 			if currentLabel != previousLabel {
-				labelsToExclude := autocomplete.LabelItemsToExclude(currentValue, currentCursorPos)
+				labelsToExclude := strategies.LabelItemsToExclude(currentValue, currentCursorPos)
 				m.ac.Show(currentLabel, labelsToExclude)
 			}
 		} else if m.isAssigning {
@@ -272,7 +273,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, *IssueAction) {
 			// Track current word context before and after the keystroke
 			previousCursorPos := m.inputBox.CursorPosition()
 			previousValue := m.inputBox.Value()
-			previousWord, _, _ := autocomplete.WhitespaceContextExtractor(previousValue, previousCursorPos)
+			previousWord, _, _ := strategies.WhitespaceContextExtractor(previousValue, previousCursorPos)
 
 			m.inputBox, taCmd = m.inputBox.Update(msg)
 			cmds = append(cmds, cmd, taCmd)
@@ -280,11 +281,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, *IssueAction) {
 			// Check for word context change after the keystroke
 			currentCursorPos := m.inputBox.CursorPosition()
 			currentValue := m.inputBox.Value()
-			currentWord, _, _ := autocomplete.WhitespaceContextExtractor(currentValue, currentCursorPos)
+			currentWord, _, _ := strategies.WhitespaceContextExtractor(currentValue, currentCursorPos)
 
 			if currentWord != previousWord {
 				// Always show autocomplete for assign mode (even with empty word)
-				existingWords := autocomplete.WhitespaceItemsToExclude(currentValue, currentCursorPos)
+				existingWords := strategies.WhitespaceItemsToExclude(currentValue, currentCursorPos)
 				m.ac.Show(currentWord, existingWords)
 			}
 		} else if m.isUnassigning {
@@ -497,9 +498,7 @@ func (m *Model) SetIsCommenting(isCommenting bool) tea.Cmd {
 		m.ac.Reset() // Clear any stale autocomplete state (e.g., from labeling)
 
 		// Set up user mention autocomplete for commenting
-		m.inputBox.ContextExtractor = autocomplete.UserMentionContextExtractor
-		m.inputBox.SuggestionInserter = autocomplete.UserMentionSuggestionInserter
-		m.inputBox.ItemsToExclude = autocomplete.UserMentionItemsToExclude
+		m.inputBox.Autocompleter = strategies.UserMentionCompleter
 	}
 	m.isCommenting = isCommenting
 	m.inputBox.SetPrompt(constants.CommentPrompt)
@@ -511,7 +510,7 @@ func (m *Model) SetIsCommenting(isCommenting bool) tea.Cmd {
 			m.repoUsers = users
 			m.ac.SetSuggestions(userSuggestions(users))
 			cursorPos := m.inputBox.CursorPosition()
-			mention, _, _ := autocomplete.UserMentionContextExtractor(m.inputBox.Value(), cursorPos)
+			mention, _, _ := strategies.UserMentionContextExtractor(m.inputBox.Value(), cursorPos)
 			if mention != "" {
 				m.ac.Show(mention, nil)
 			}
@@ -536,9 +535,7 @@ func (m *Model) SetIsAssigning(isAssigning bool) tea.Cmd {
 		m.ac.Reset() // Clear any stale autocomplete state (e.g., from labeling)
 
 		// Set up whitespace-based autocomplete for assigning (users are whitespace-separated)
-		m.inputBox.ContextExtractor = autocomplete.WhitespaceContextExtractor
-		m.inputBox.SuggestionInserter = autocomplete.WhitespaceSuggestionInserter
-		m.inputBox.ItemsToExclude = autocomplete.WhitespaceItemsToExclude
+		m.inputBox.Autocompleter = strategies.WhitespaceWordCompleter
 	}
 	m.isAssigning = isAssigning
 	m.inputBox.SetPrompt(constants.AssignPrompt)
@@ -556,8 +553,8 @@ func (m *Model) SetIsAssigning(isAssigning bool) tea.Cmd {
 			m.ac.SetSuggestions(userSuggestions(users))
 			// Show autocomplete immediately for current word at cursor
 			cursorPos := m.inputBox.CursorPosition()
-			currentWord, _, _ := autocomplete.WhitespaceContextExtractor(m.inputBox.Value(), cursorPos)
-			existingWords := autocomplete.WhitespaceItemsToExclude(m.inputBox.Value(), cursorPos)
+			currentWord, _, _ := strategies.WhitespaceContextExtractor(m.inputBox.Value(), cursorPos)
+			existingWords := strategies.WhitespaceItemsToExclude(m.inputBox.Value(), cursorPos)
 			m.ac.Show(currentWord, existingWords)
 			return tea.Sequence(m.fetchUsers(), textarea.Blink, m.inputBox.Focus())
 		}
@@ -574,9 +571,7 @@ func (m *Model) SetIsLabeling(isLabeling bool) tea.Cmd {
 		m.inputBox.Reset()
 
 		// Set up label autocomplete for labeling
-		m.inputBox.ContextExtractor = autocomplete.LabelContextExtractor
-		m.inputBox.SuggestionInserter = autocomplete.LabelSuggestionInserter
-		m.inputBox.ItemsToExclude = autocomplete.LabelItemsToExclude
+		m.inputBox.Autocompleter = strategies.LabelCompleter
 	}
 	m.isLabeling = isLabeling
 	m.inputBox.SetPrompt(constants.LabelPrompt)
@@ -601,8 +596,8 @@ func (m *Model) SetIsLabeling(isLabeling bool) tea.Cmd {
 			m.repoLabels = labels
 			m.ac.SetSuggestions(labelSuggestions(labels))
 			cursorPos := m.inputBox.CursorPosition()
-			currentLabel, _, _ := autocomplete.LabelContextExtractor(m.inputBox.Value(), cursorPos)
-			existingLabels := autocomplete.LabelItemsToExclude(m.inputBox.Value(), cursorPos)
+			currentLabel, _, _ := strategies.LabelContextExtractor(m.inputBox.Value(), cursorPos)
+			existingLabels := strategies.LabelItemsToExclude(m.inputBox.Value(), cursorPos)
 			m.ac.Show(currentLabel, existingLabels)
 			return tea.Sequence(textarea.Blink, m.inputBox.Focus())
 		} else {
