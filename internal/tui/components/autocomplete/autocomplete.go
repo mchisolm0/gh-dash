@@ -241,37 +241,39 @@ func (m *Model) View() string {
 	popupStyle := m.ctx.Styles.Autocomplete.PopupStyle.Width(m.width)
 	valueStyle := lipgloss.NewStyle().Foreground(m.ctx.Theme.PrimaryText)
 	detailStyle := lipgloss.NewStyle().Foreground(m.ctx.Theme.FaintText)
+	selectedRowStyle := lipgloss.NewStyle().Background(m.ctx.Theme.SelectedBackground).Bold(true)
 	maxLabelWidth := m.width - popupStyle.GetHorizontalPadding()
-	ellipsisWidth := lipgloss.Width(constants.Ellipsis)
+	selectedPrefix := constants.SelectionIcon + " "
+	selectedPrefixWidth := lipgloss.Width(selectedPrefix)
+	normalPrefix := "  "
+	normalPrefixWidth := lipgloss.Width(normalPrefix)
 
 	for i := 0; i < numVisible && i < len(m.filtered); i++ {
 		suggestion := m.filtered[i]
 		valueText := suggestion.Value
-		detailText := ""
-		if strings.TrimSpace(suggestion.Detail) != "" {
-			detailText = " " + suggestion.Detail
-		}
+		detailText := strings.TrimSpace(suggestion.Detail)
 
-		totalWidth := lipgloss.Width(valueText) + lipgloss.Width(detailText)
-		if totalWidth > maxLabelWidth {
-			if lipgloss.Width(valueText) >= maxLabelWidth {
-				valueText = ansi.Truncate(valueText, max(0, maxLabelWidth-ellipsisWidth), constants.Ellipsis)
-				detailText = ""
-			} else {
-				remaining := maxLabelWidth - lipgloss.Width(valueText)
-				detailText = ansi.Truncate(detailText, remaining, constants.Ellipsis)
-			}
-		}
-
-		row := valueStyle.Render(valueText) + detailStyle.Render(detailText)
-
-		// Style based on selection
+		valuePrefix := normalPrefix
+		valuePrefixWidth := normalPrefixWidth
+		detailPrefix := normalPrefix + "  "
 		if i == m.selected {
-			// Selected row - use inverted colors
-			b.WriteString(m.ctx.Styles.Autocomplete.SelectedStyle.Render(constants.SelectionIcon + " " + row))
+			valuePrefix = selectedPrefix
+			valuePrefixWidth = selectedPrefixWidth
+			detailPrefix = strings.Repeat(" ", selectedPrefixWidth+2)
+		}
+
+		valueText = ansi.Truncate(valueText, max(0, maxLabelWidth-valuePrefixWidth), constants.Ellipsis)
+		row := valuePrefix + valueStyle.Render(valueText)
+
+		if detailText != "" {
+			detailText = ansi.Truncate(detailText, max(0, maxLabelWidth-lipgloss.Width(detailPrefix)), constants.Ellipsis)
+			row += "\n" + detailPrefix + detailStyle.Render(detailText)
+		}
+
+		if i == m.selected {
+			b.WriteString(selectedRowStyle.Render(row))
 		} else {
-			// Non-selected row
-			b.WriteString("  " + row)
+			b.WriteString(row)
 		}
 
 		if i < numVisible-1 {
