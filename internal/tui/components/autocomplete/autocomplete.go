@@ -167,14 +167,30 @@ func (m *Model) Show(currentItem string, excludeItems []string) {
 
 func (m *Model) Selected() Suggestion {
 	if m.selected >= 0 && m.selected < len(m.filtered) {
-		return m.filtered[m.selected]
+		selected := m.filtered[m.selected]
+		if selected.Value != "" {
+			return selected
+		}
 	}
 	return Suggestion{}
 }
 
 func (m *Model) Next() {
-	if len(m.filtered) > 0 {
-		m.selected = (m.selected + 1) % len(m.filtered)
+	if len(m.filtered) == 0 {
+		return
+	}
+
+	start := m.selected
+	if start < 0 || start >= len(m.filtered) {
+		start = 0
+	}
+
+	for i := 1; i <= len(m.filtered); i++ {
+		next := (start + i) % len(m.filtered)
+		if m.filtered[next].Value != "" {
+			m.selected = next
+			return
+		}
 	}
 }
 
@@ -182,9 +198,21 @@ func (m *Model) Prev() {
 	if len(m.filtered) == 0 {
 		return
 	}
-	m.selected--
-	if m.selected < 0 {
-		m.selected = len(m.filtered) - 1
+
+	start := m.selected
+	if start < 0 || start >= len(m.filtered) {
+		start = 0
+	}
+
+	for i := 1; i <= len(m.filtered); i++ {
+		prev := start - i
+		if prev < 0 {
+			prev += len(m.filtered)
+		}
+		if m.filtered[prev].Value != "" {
+			m.selected = prev
+			return
+		}
 	}
 }
 
