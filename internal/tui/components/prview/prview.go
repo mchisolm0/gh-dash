@@ -20,6 +20,7 @@ import (
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/inputbox/strategies"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/prrow"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/prssection"
+	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/repoautocomplete"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/constants"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/context"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/keys"
@@ -32,26 +33,6 @@ var (
 	lineCleanupRegex = regexp.MustCompile(`((\n)+|^)([^\r\n]*\|[^\r\n]*(\n)?)+`)
 	foldBodyHeight   = 8
 )
-
-// RepoLabelsFetchedMsg is sent when repository labels are successfully fetched
-type RepoLabelsFetchedMsg struct {
-	Labels []data.Label
-}
-
-// RepoLabelsFetchFailedMsg is sent when repository label fetching fails
-type RepoLabelsFetchFailedMsg struct {
-	Err error
-}
-
-// RepoUsersFetchedMsg is sent when repository users are successfully fetched
-type RepoUsersFetchedMsg struct {
-	Users []data.User
-}
-
-// RepoUsersFetchFailedMsg is sent when repository user fetching fails
-type RepoUsersFetchFailedMsg struct {
-	Err error
-}
 
 // PrActionErrorMsg is sent when a PR action fails
 type PrActionErrorMsg struct {
@@ -122,12 +103,12 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	)
 
 	switch msg := msg.(type) {
-	case RepoLabelsFetchedMsg:
+	case repoautocomplete.RepoLabelsFetchedMsg:
 		clearCmd := m.ac.SetFetchSuccess()
 		m.repoLabels = msg.Labels
 		// Only set suggestions and show if we're actually in labeling mode
 		if m.isLabeling {
-			m.ac.SetSuggestions(labelSuggestions(msg.Labels))
+			m.ac.SetSuggestions(repoautocomplete.LabelSuggestions(msg.Labels))
 			cursorPos := m.inputBox.CursorPosition()
 			currentLabel, _, _ := strategies.LabelContextExtractor(m.inputBox.Value(), cursorPos)
 			existingLabels := strategies.LabelItemsToExclude(m.inputBox.Value(), cursorPos)
@@ -135,16 +116,16 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		return m, clearCmd
 
-	case RepoLabelsFetchFailedMsg:
+	case repoautocomplete.RepoLabelsFetchFailedMsg:
 		clearCmd := m.ac.SetFetchError(msg.Err)
 		return m, clearCmd
 
-	case RepoUsersFetchedMsg:
+	case repoautocomplete.RepoUsersFetchedMsg:
 		clearCmd := m.ac.SetFetchSuccess()
 		m.repoUsers = msg.Users
 		// Only set suggestions if we're in a mode that uses user suggestions
 		if m.isCommenting || m.isApproving || m.isAssigning {
-			m.ac.SetSuggestions(userSuggestions(msg.Users))
+			m.ac.SetSuggestions(repoautocomplete.UserSuggestions(msg.Users))
 			if m.isCommenting {
 				cursorPos := m.inputBox.CursorPosition()
 				mention, _, _ := strategies.UserMentionContextExtractor(m.inputBox.Value(), cursorPos)
@@ -160,7 +141,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		return m, clearCmd
 
-	case RepoUsersFetchFailedMsg:
+	case repoautocomplete.RepoUsersFetchFailedMsg:
 		clearCmd := m.ac.SetFetchError(msg.Err)
 		return m, clearCmd
 
@@ -886,7 +867,7 @@ func (m *Model) SetIsCommenting(isCommenting bool) tea.Cmd {
 		repoName := m.pr.Data.Primary.GetRepoNameWithOwner()
 		if users, ok := data.CachedRepoUsers(repoName); ok {
 			m.repoUsers = users
-			m.ac.SetSuggestions(userSuggestions(users))
+			m.ac.SetSuggestions(repoautocomplete.UserSuggestions(users))
 			cursorPos := m.inputBox.CursorPosition()
 			mention, _, _ := strategies.UserMentionContextExtractor(m.inputBox.Value(), cursorPos)
 			if mention != "" {
@@ -927,7 +908,7 @@ func (m *Model) SetIsApproving(isApproving bool) tea.Cmd {
 		repoName := m.pr.Data.Primary.GetRepoNameWithOwner()
 		if users, ok := data.CachedRepoUsers(repoName); ok {
 			m.repoUsers = users
-			m.ac.SetSuggestions(userSuggestions(users))
+			m.ac.SetSuggestions(repoautocomplete.UserSuggestions(users))
 			// Show autocomplete immediately for current word at cursor
 			cursorPos := m.inputBox.CursorPosition()
 			currentWord, _, _ := strategies.WhitespaceContextExtractor(m.inputBox.Value(), cursorPos)
@@ -971,7 +952,7 @@ func (m *Model) SetIsAssigning(isAssigning bool) tea.Cmd {
 		repoName := m.pr.Data.Primary.GetRepoNameWithOwner()
 		if users, ok := data.CachedRepoUsers(repoName); ok {
 			m.repoUsers = users
-			m.ac.SetSuggestions(userSuggestions(users))
+			m.ac.SetSuggestions(repoautocomplete.UserSuggestions(users))
 			// Show autocomplete immediately for current word at cursor
 			cursorPos := m.inputBox.CursorPosition()
 			currentWord, _, _ := strategies.WhitespaceContextExtractor(m.inputBox.Value(), cursorPos)
@@ -1088,7 +1069,7 @@ func (m *Model) SetIsLabeling(isLabeling bool) tea.Cmd {
 		if labels, ok := data.CachedRepoLabels(repoName); ok {
 			// Use cached labels
 			m.repoLabels = labels
-			m.ac.SetSuggestions(labelSuggestions(labels))
+			m.ac.SetSuggestions(repoautocomplete.LabelSuggestions(labels))
 			cursorPos := m.inputBox.CursorPosition()
 			currentLabel, _, _ := strategies.LabelContextExtractor(m.inputBox.Value(), cursorPos)
 			existingLabels := strategies.LabelItemsToExclude(m.inputBox.Value(), cursorPos)
@@ -1104,75 +1085,19 @@ func (m *Model) SetIsLabeling(isLabeling bool) tea.Cmd {
 
 // fetchLabels returns a command to fetch repository labels
 func (m *Model) fetchLabels() tea.Cmd {
-	spinnerTickCmd := m.ac.SetFetchLoading()
-
-	fetchCmd := func() tea.Msg {
-		repoName := m.pr.Data.Primary.GetRepoNameWithOwner()
-		labels, err := data.FetchRepoLabels(repoName)
-		if err != nil {
-			return RepoLabelsFetchFailedMsg{Err: err}
-		}
-		return RepoLabelsFetchedMsg{Labels: labels}
-	}
-
-	return tea.Batch(spinnerTickCmd, fetchCmd)
-}
-
-func labelSuggestions(labels []data.Label) []autocomplete.Suggestion {
-	suggestions := make([]autocomplete.Suggestion, len(labels))
-	for i, label := range labels {
-		suggestions[i] = autocomplete.Suggestion{Value: label.Name}
-	}
-	return suggestions
-}
-
-func userSuggestions(users []data.User) []autocomplete.Suggestion {
-	suggestions := make([]autocomplete.Suggestion, len(users))
-	for i, user := range users {
-		suggestions[i] = autocomplete.Suggestion{
-			Value:  user.Login,
-			Detail: user.Name,
-		}
-	}
-	return suggestions
+	return repoautocomplete.FetchLabels(m.pr.Data.Primary.GetRepoNameWithOwner(), m.ac)
 }
 
 // fetchUsers returns a command to fetch repository users for @-mention autocomplete
 // This shows a loading UI - use when user explicitly requests a refresh (e.g., Ctrl+f)
 func (m *Model) fetchUsers() tea.Cmd {
-	spinnerTickCmd := m.ac.SetFetchLoading()
-
-	fetchCmd := func() tea.Msg {
-		repoNameWithOwner := m.pr.Data.Primary.GetRepoNameWithOwner()
-		repoOwner, repoName, ok := strings.Cut(repoNameWithOwner, "/")
-		if !ok {
-			return RepoUsersFetchFailedMsg{Err: fmt.Errorf("invalid repo name with owner: %q", repoNameWithOwner)}
-		}
-		users, err := data.FetchRepoUsers(repoName, repoOwner, repoNameWithOwner)
-		if err != nil {
-			return RepoUsersFetchFailedMsg{Err: err}
-		}
-		return RepoUsersFetchedMsg{Users: users}
-	}
-
-	return tea.Batch(spinnerTickCmd, fetchCmd)
+	return repoautocomplete.FetchUsers(m.pr.Data.Primary.GetRepoNameWithOwner(), m.ac, true)
 }
 
 // fetchUsersSilent returns a command to fetch repository users without showing loading UI
 // Use this for background fetching when entering commenting/approving modes
 func (m *Model) fetchUsersSilent() tea.Cmd {
-	return func() tea.Msg {
-		repoNameWithOwner := m.pr.Data.Primary.GetRepoNameWithOwner()
-		repoOwner, repoName, ok := strings.Cut(repoNameWithOwner, "/")
-		if !ok {
-			return RepoUsersFetchFailedMsg{Err: fmt.Errorf("invalid repo name with owner: %q", repoNameWithOwner)}
-		}
-		users, err := data.FetchRepoUsers(repoName, repoOwner, repoNameWithOwner)
-		if err != nil {
-			return RepoUsersFetchFailedMsg{Err: err}
-		}
-		return RepoUsersFetchedMsg{Users: users}
-	}
+	return repoautocomplete.FetchUsers(m.pr.Data.Primary.GetRepoNameWithOwner(), m.ac, false)
 }
 
 // prLabels returns the current labels of the PR as a slice of strings
