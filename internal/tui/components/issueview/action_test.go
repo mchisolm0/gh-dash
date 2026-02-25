@@ -8,11 +8,20 @@ import (
 
 	"github.com/dlvhdr/gh-dash/v4/internal/config"
 	"github.com/dlvhdr/gh-dash/v4/internal/data"
+	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/autocomplete"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/issuerow"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/context"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/keys"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/theme"
 )
+
+func suggestions(values ...string) []autocomplete.Suggestion {
+	out := make([]autocomplete.Suggestion, len(values))
+	for i, value := range values {
+		out[i] = autocomplete.Suggestion{Value: value}
+	}
+	return out
+}
 
 func newTestModelForAction(t *testing.T) Model {
 	t.Helper()
@@ -166,7 +175,7 @@ func TestAutocompleteStateResetWhenSwitchingModes(t *testing.T) {
 
 	// Simulate what happens when entering labeling mode:
 	// 1. Autocomplete gets populated with label suggestions
-	m.ac.SetSuggestions([]string{"bug", "feature", "documentation", "enhancement"})
+	m.ac.SetSuggestions(suggestions("bug", "feature", "documentation", "enhancement"))
 
 	// 2. User types something and autocomplete filters/shows suggestions
 	// This populates the internal 'filtered' slice
@@ -199,7 +208,7 @@ func TestAutocompleteResetOnAssignMode(t *testing.T) {
 	m := newTestModelForAction(t)
 
 	// Set up autocomplete with label suggestions
-	m.ac.SetSuggestions([]string{"bug", "feature"})
+	m.ac.SetSuggestions(suggestions("bug", "feature"))
 	m.ac.Show("bug", nil)
 	require.True(t, m.ac.HasSuggestions(), "precondition: autocomplete should have suggestions")
 
@@ -216,7 +225,7 @@ func TestAutocompleteResetOnUnassignMode(t *testing.T) {
 	m := newTestModelForAction(t)
 
 	// Set up autocomplete with label suggestions
-	m.ac.SetSuggestions([]string{"bug", "feature"})
+	m.ac.SetSuggestions(suggestions("bug", "feature"))
 	m.ac.Show("bug", nil)
 	require.True(t, m.ac.HasSuggestions(), "precondition: autocomplete should have suggestions")
 
@@ -235,7 +244,7 @@ func TestInputBoxTextNotReplacedByStaleAutocomplete(t *testing.T) {
 	m := newTestModelForAction(t)
 
 	// Step 1: Simulate labeling mode with suggestions
-	m.ac.SetSuggestions([]string{"bug", "feature", "documentation"})
+	m.ac.SetSuggestions(suggestions("bug", "feature", "documentation"))
 	m.isLabeling = true
 	m.ac.Show("fea", nil) // User typed "fea", matches "feature"
 

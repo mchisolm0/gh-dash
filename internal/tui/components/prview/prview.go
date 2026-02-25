@@ -126,10 +126,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case RepoLabelsFetchedMsg:
 		clearCmd := m.ac.SetFetchSuccess()
 		m.repoLabels = msg.Labels
-		labelNames := data.LabelNames(msg.Labels)
 		// Only set suggestions and show if we're actually in labeling mode
 		if m.isLabeling {
-			m.ac.SetSuggestions(labelNames)
+			m.ac.SetSuggestions(labelSuggestions(msg.Labels))
 			cursorPos := m.inputBox.CursorPosition()
 			currentLabel, _, _ := autocomplete.LabelContextExtractor(m.inputBox.Value(), cursorPos)
 			existingLabels := autocomplete.LabelItemsToExclude(m.inputBox.Value(), cursorPos)
@@ -146,7 +145,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.repoUsers = msg.Users
 		// Only set suggestions if we're in a mode that uses user suggestions
 		if m.isCommenting || m.isApproving || m.isAssigning {
-			m.ac.SetSuggestions(data.UserLogins(msg.Users))
+			m.ac.SetSuggestions(userSuggestions(msg.Users))
 			if m.isCommenting {
 				cursorPos := m.inputBox.CursorPosition()
 				mention, _, _ := autocomplete.UserMentionContextExtractor(m.inputBox.Value(), cursorPos)
@@ -890,7 +889,7 @@ func (m *Model) SetIsCommenting(isCommenting bool) tea.Cmd {
 		repoName := m.pr.Data.Primary.GetRepoNameWithOwner()
 		if users, ok := data.CachedRepoUsers(repoName); ok {
 			m.repoUsers = users
-			m.ac.SetSuggestions(data.UserLogins(users))
+			m.ac.SetSuggestions(userSuggestions(users))
 			cursorPos := m.inputBox.CursorPosition()
 			mention, _, _ := autocomplete.UserMentionContextExtractor(m.inputBox.Value(), cursorPos)
 			if mention != "" {
@@ -933,7 +932,7 @@ func (m *Model) SetIsApproving(isApproving bool) tea.Cmd {
 		repoName := m.pr.Data.Primary.GetRepoNameWithOwner()
 		if users, ok := data.CachedRepoUsers(repoName); ok {
 			m.repoUsers = users
-			m.ac.SetSuggestions(data.UserLogins(users))
+			m.ac.SetSuggestions(userSuggestions(users))
 			// Show autocomplete immediately for current word at cursor
 			cursorPos := m.inputBox.CursorPosition()
 			currentWord, _, _ := autocomplete.WhitespaceContextExtractor(m.inputBox.Value(), cursorPos)
@@ -979,7 +978,7 @@ func (m *Model) SetIsAssigning(isAssigning bool) tea.Cmd {
 		repoName := m.pr.Data.Primary.GetRepoNameWithOwner()
 		if users, ok := data.CachedRepoUsers(repoName); ok {
 			m.repoUsers = users
-			m.ac.SetSuggestions(data.UserLogins(users))
+			m.ac.SetSuggestions(userSuggestions(users))
 			// Show autocomplete immediately for current word at cursor
 			cursorPos := m.inputBox.CursorPosition()
 			currentWord, _, _ := autocomplete.WhitespaceContextExtractor(m.inputBox.Value(), cursorPos)
@@ -1098,7 +1097,7 @@ func (m *Model) SetIsLabeling(isLabeling bool) tea.Cmd {
 		if labels, ok := data.CachedRepoLabels(repoName); ok {
 			// Use cached labels
 			m.repoLabels = labels
-			m.ac.SetSuggestions(data.LabelNames(labels))
+			m.ac.SetSuggestions(labelSuggestions(labels))
 			cursorPos := m.inputBox.CursorPosition()
 			currentLabel, _, _ := autocomplete.LabelContextExtractor(m.inputBox.Value(), cursorPos)
 			existingLabels := autocomplete.LabelItemsToExclude(m.inputBox.Value(), cursorPos)
@@ -1126,6 +1125,25 @@ func (m *Model) fetchLabels() tea.Cmd {
 	}
 
 	return tea.Batch(spinnerTickCmd, fetchCmd)
+}
+
+func labelSuggestions(labels []data.Label) []autocomplete.Suggestion {
+	suggestions := make([]autocomplete.Suggestion, len(labels))
+	for i, label := range labels {
+		suggestions[i] = autocomplete.Suggestion{Value: label.Name}
+	}
+	return suggestions
+}
+
+func userSuggestions(users []data.User) []autocomplete.Suggestion {
+	suggestions := make([]autocomplete.Suggestion, len(users))
+	for i, user := range users {
+		suggestions[i] = autocomplete.Suggestion{
+			Value:  user.Login,
+			Detail: user.Name,
+		}
+	}
+	return suggestions
 }
 
 // fetchUsers returns a command to fetch repository users for @-mention autocomplete

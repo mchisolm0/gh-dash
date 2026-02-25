@@ -111,11 +111,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				return m, nil
 			case key.Matches(msg, autocomplete.SelectKey):
 				selected := m.autocomplete.Selected()
-				if selected != "" && m.ContextExtractor != nil && m.SuggestionInserter != nil {
+				if selected.Value != "" && m.ContextExtractor != nil && m.SuggestionInserter != nil {
 					currentValue := m.textArea.Value()
 					cursorPos := m.CursorPosition()
 					_, contextStart, contextEnd := m.ContextExtractor(currentValue, cursorPos)
-					newValue, newCursorPos := m.SuggestionInserter(currentValue, selected, contextStart, contextEnd)
+					newValue, newCursorPos := m.SuggestionInserter(currentValue, selected.Value, contextStart, contextEnd)
 					m.textArea.SetValue(newValue)
 					m.textArea.SetCursor(newCursorPos)
 					// Refresh autocomplete to exclude the newly-added item

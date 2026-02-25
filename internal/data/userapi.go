@@ -16,6 +16,12 @@ var (
 
 type User struct {
 	Login string `json:"login"`
+	Name  string `json:"name"`
+}
+
+type UserSuggestion struct {
+	Login string
+	Name  string
 }
 
 type MentionableUsersResponse struct {
@@ -42,7 +48,6 @@ func FetchRepoUsers(repoNameWithOwner string) ([]User, error) {
 		log.Debug("FetchRepoUsers: cache hit", "repo", repoNameWithOwner, "count", len(cachedUsers))
 		return cachedUsers, nil
 	}
-	log.Debug("FetchRepoUsers: cache miss", "repo", repoNameWithOwner)
 
 	parts := splitRepoName(repoNameWithOwner)
 	if len(parts) != 2 {
@@ -58,8 +63,6 @@ func FetchRepoUsers(repoNameWithOwner string) ([]User, error) {
 			return nil, err
 		}
 	}
-
-	log.Debug("FetchRepoUsers: executing GraphQL query", "repo", repoNameWithOwner)
 
 	// Query only publicly available mentionable users
 	// This includes anyone who has interacted with the repo (issues, PRs, comments)
@@ -106,6 +109,17 @@ func UserLogins(users []User) []string {
 		logins[i] = user.Login
 	}
 	return logins
+}
+
+func UserSuggestions(users []User) []UserSuggestion {
+	suggestions := make([]UserSuggestion, len(users))
+	for i, user := range users {
+		suggestions[i] = UserSuggestion{
+			Login: user.Login,
+			Name:  user.Name,
+		}
+	}
+	return suggestions
 }
 
 // splitRepoName splits "owner/repo" into ["owner", "repo"]
