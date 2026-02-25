@@ -278,6 +278,7 @@ func (m *Model) View() string {
 	normalPrefixWidth := lipgloss.Width(normalPrefix)
 	maxPrefixWidth := max(selectedPrefixWidth, normalPrefixWidth)
 	columnGap := 2
+	minValueWidth := 8
 	minDetailWidth := 10
 	totalContentWidth := max(0, maxLabelWidth-maxPrefixWidth)
 
@@ -292,12 +293,14 @@ func (m *Model) View() string {
 
 	valueColumnWidth := totalContentWidth
 	if hasAnyDetail && totalContentWidth > 0 {
-		preferredValueWidth := min(maxValueWidth, max(8, (totalContentWidth*2)/3))
 		maxValueForDetails := max(0, totalContentWidth-columnGap-minDetailWidth)
-		if preferredValueWidth > maxValueForDetails {
-			preferredValueWidth = maxValueForDetails
+		if totalContentWidth < minValueWidth+columnGap+minDetailWidth {
+			valueColumnWidth = totalContentWidth
+		} else {
+			preferredValueWidth := min(maxValueWidth, max(minValueWidth, (totalContentWidth*2)/3))
+			preferredValueWidth = min(maxValueForDetails, max(minValueWidth, preferredValueWidth))
+			valueColumnWidth = preferredValueWidth
 		}
-		valueColumnWidth = preferredValueWidth
 	}
 	detailColumnWidth := max(0, totalContentWidth-valueColumnWidth-columnGap)
 	valueColumnStyle := lipgloss.NewStyle().Width(valueColumnWidth)
