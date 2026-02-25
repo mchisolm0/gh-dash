@@ -240,13 +240,39 @@ func (m *Model) View() string {
 
 	popupStyle := m.ctx.Styles.Autocomplete.PopupStyle.Width(m.width)
 	valueStyle := lipgloss.NewStyle().Foreground(m.ctx.Theme.PrimaryText)
-	detailStyle := lipgloss.NewStyle().Foreground(m.ctx.Theme.FaintText)
-	selectedRowStyle := lipgloss.NewStyle().Background(m.ctx.Theme.SelectedBackground).Bold(true)
+	selectedValueStyle := valueStyle.Bold(true)
+	detailStyle := lipgloss.NewStyle().Foreground(m.ctx.Theme.FaintText).Faint(true)
+	selectedRowStyle := lipgloss.NewStyle().Background(m.ctx.Theme.SelectedBackground)
 	maxLabelWidth := m.width - popupStyle.GetHorizontalPadding()
 	selectedPrefix := constants.SelectionIcon + " "
 	selectedPrefixWidth := lipgloss.Width(selectedPrefix)
 	normalPrefix := "  "
 	normalPrefixWidth := lipgloss.Width(normalPrefix)
+	maxPrefixWidth := max(selectedPrefixWidth, normalPrefixWidth)
+	columnGap := 2
+	minDetailWidth := 10
+	totalContentWidth := max(0, maxLabelWidth-maxPrefixWidth)
+
+	// Compute a shared value column width so details align on a single line.
+	maxValueWidth := 0
+	hasAnyDetail := false
+	for i := 0; i < numVisible && i < len(m.filtered); i++ {
+		suggestion := m.filtered[i]
+		maxValueWidth = max(maxValueWidth, lipgloss.Width(suggestion.Value))
+		hasAnyDetail = hasAnyDetail || strings.TrimSpace(suggestion.Detail) != ""
+	}
+
+	valueColumnWidth := totalContentWidth
+	if hasAnyDetail && totalContentWidth > 0 {
+		preferredValueWidth := min(maxValueWidth, max(8, (totalContentWidth*2)/3))
+		maxValueForDetails := max(0, totalContentWidth-columnGap-minDetailWidth)
+		if preferredValueWidth > maxValueForDetails {
+			preferredValueWidth = maxValueForDetails
+		}
+		valueColumnWidth = preferredValueWidth
+	}
+	detailColumnWidth := max(0, totalContentWidth-valueColumnWidth-columnGap)
+	valueColumnStyle := lipgloss.NewStyle().Width(valueColumnWidth)
 
 	for i := 0; i < numVisible && i < len(m.filtered); i++ {
 		suggestion := m.filtered[i]
@@ -255,19 +281,22 @@ func (m *Model) View() string {
 
 		valuePrefix := normalPrefix
 		valuePrefixWidth := normalPrefixWidth
-		detailPrefix := normalPrefix + "  "
 		if i == m.selected {
 			valuePrefix = selectedPrefix
 			valuePrefixWidth = selectedPrefixWidth
-			detailPrefix = strings.Repeat(" ", selectedPrefixWidth+2)
 		}
 
-		valueText = ansi.Truncate(valueText, max(0, maxLabelWidth-valuePrefixWidth), constants.Ellipsis)
-		row := valuePrefix + valueStyle.Render(valueText)
+		valueText = ansi.Truncate(valueText, valueColumnWidth, constants.Ellipsis)
+		rowValueStyle := valueStyle
+		if i == m.selected {
+			rowValueStyle = selectedValueStyle
+		}
+		prefixPad := strings.Repeat(" ", max(0, maxPrefixWidth-valuePrefixWidth))
+		row := valuePrefix + prefixPad + valueColumnStyle.Render(rowValueStyle.Render(valueText))
 
-		if detailText != "" {
-			detailText = ansi.Truncate(detailText, max(0, maxLabelWidth-lipgloss.Width(detailPrefix)), constants.Ellipsis)
-			row += "\n" + detailPrefix + detailStyle.Render(detailText)
+		if detailText != "" && detailColumnWidth > 0 {
+			detailText = ansi.Truncate(detailText, detailColumnWidth, constants.Ellipsis)
+			row += strings.Repeat(" ", columnGap) + detailStyle.Render(detailText)
 		}
 
 		if i == m.selected {
