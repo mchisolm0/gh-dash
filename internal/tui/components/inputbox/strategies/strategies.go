@@ -199,7 +199,7 @@ func isWordBoundary(r rune) bool {
 
 func UserMentionContextExtractor(input string, cursorPos int) (context string, start int, end int) {
 	if input == "" {
-		return "", -1, -1
+		return "", 0, 0
 	}
 
 	runes := []rune(input)
@@ -220,10 +220,10 @@ func UserMentionContextExtractor(input string, cursorPos int) (context string, s
 	}
 
 	if wordStart >= len(runes) {
-		return "", -1, -1
+		return "", 0, 0
 	}
 	if runes[wordStart] != '@' {
-		return "", -1, -1
+		return "", 0, 0
 	}
 
 	wordEnd := len(runes)
