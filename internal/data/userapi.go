@@ -11,6 +11,8 @@ import (
 var (
 	repoUserCache = make(map[string][]User)
 	userCacheMu   sync.RWMutex
+	userClientMu  sync.Mutex
+	userClientErr error
 )
 
 type User struct {
@@ -49,12 +51,9 @@ func FetchRepoUsers(repoName string, repoOwner string, repoNameWithOwner string)
 	}
 
 	// Initialize client if needed
-	if client == nil {
-		var err error
-		client, err = gh.DefaultGraphQLClient()
-		if err != nil {
-			return nil, err
-		}
+	userClient, err := getUserClient()
+	if err != nil {
+		return nil, err
 	}
 
 	// Query only publicly available mentionable users
@@ -66,7 +65,7 @@ func FetchRepoUsers(repoName string, repoOwner string, repoNameWithOwner string)
 		"limit": graphql.Int(100),
 	}
 
-	err := client.Query("GetMentionableUsers", &result, variables)
+	err = userClient.Query("GetMentionableUsers", &result, variables)
 	if err != nil {
 		log.Error("FetchRepoUsers: GraphQL query failed", "repo", repoNameWithOwner, "err", err)
 		return nil, err
@@ -82,6 +81,21 @@ func FetchRepoUsers(repoName string, repoOwner string, repoNameWithOwner string)
 		"repo", repoNameWithOwner,
 		"count", len(users))
 	return users, nil
+}
+
+func getUserClient() (*gh.GraphQLClient, error) {
+	userClientMu.Lock()
+	defer userClientMu.Unlock()
+
+	if client == nil {
+		client, userClientErr = gh.DefaultGraphQLClient()
+	}
+
+	if client != nil {
+		return client, nil
+	}
+
+	return nil, userClientErr
 }
 
 func ClearUserCache() {
