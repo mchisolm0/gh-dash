@@ -302,9 +302,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			if key.Matches(msg, autocomplete.RefreshSuggestionsKey) {
 				if m.pr != nil {
 					repoName := m.pr.Data.Primary.GetRepoNameWithOwner()
-					data.ClearRepoLabelCache(repoName)
+					data.ClearRepoUserCache(repoName)
 				}
-				cmds = append(cmds, m.fetchLabels())
+				cmds = append(cmds, m.fetchUsers())
 			}
 
 			// Track current word context before and after the keystroke
