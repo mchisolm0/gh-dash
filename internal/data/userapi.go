@@ -23,7 +23,7 @@ type UserSuggestion struct {
 	Name  string
 }
 
-type MentionableUsersResponse struct {
+type mentionableUsersResponse struct {
 	Repository struct {
 		MentionableUsers struct {
 			Nodes []User
@@ -59,7 +59,7 @@ func FetchRepoUsers(repoName string, repoOwner string, repoNameWithOwner string)
 
 	// Query only publicly available mentionable users
 	// This includes anyone who has interacted with the repo (issues, PRs, comments)
-	var result MentionableUsersResponse
+	var result mentionableUsersResponse
 	variables := map[string]any{
 		"owner": graphql.String(repoOwner),
 		"name":  graphql.String(repoName),
