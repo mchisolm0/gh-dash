@@ -1,7 +1,6 @@
 package data
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/charmbracelet/log"
@@ -42,18 +41,12 @@ func CachedRepoUsers(repoNameWithOwner string) ([]User, bool) {
 // FetchRepoUsers fetches users that can be mentioned in a repository.
 // It uses the publicly available mentionableUsers field which includes
 // anyone who can interact with the repository (issue/PR authors, commenters, etc.)
-func FetchRepoUsers(repoNameWithOwner string) ([]User, error) {
+func FetchRepoUsers(repoName string, repoOwner string, repoNameWithOwner string) ([]User, error) {
 	// Check cache first
 	if cachedUsers, ok := CachedRepoUsers(repoNameWithOwner); ok {
 		log.Debug("FetchRepoUsers: cache hit", "repo", repoNameWithOwner, "count", len(cachedUsers))
 		return cachedUsers, nil
 	}
-
-	parts := splitRepoName(repoNameWithOwner)
-	if len(parts) != 2 {
-		return nil, fmt.Errorf("invalid repo name format: %s", repoNameWithOwner)
-	}
-	owner, name := parts[0], parts[1]
 
 	// Initialize client if needed
 	if client == nil {
@@ -68,8 +61,8 @@ func FetchRepoUsers(repoNameWithOwner string) ([]User, error) {
 	// This includes anyone who has interacted with the repo (issues, PRs, comments)
 	var result MentionableUsersResponse
 	variables := map[string]any{
-		"owner": graphql.String(owner),
-		"name":  graphql.String(name),
+		"owner": graphql.String(repoOwner),
+		"name":  graphql.String(repoName),
 		"limit": graphql.Int(100),
 	}
 

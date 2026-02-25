@@ -1152,8 +1152,12 @@ func (m *Model) fetchUsers() tea.Cmd {
 	spinnerTickCmd := m.ac.SetFetchLoading()
 
 	fetchCmd := func() tea.Msg {
-		repoName := m.pr.Data.Primary.GetRepoNameWithOwner()
-		users, err := data.FetchRepoUsers(repoName)
+		repoNameWithOwner := m.pr.Data.Primary.GetRepoNameWithOwner()
+		repoOwner, repoName, ok := strings.Cut(repoNameWithOwner, "/")
+		if !ok {
+			return RepoUsersFetchFailedMsg{Err: fmt.Errorf("invalid repo name with owner: %q", repoNameWithOwner)}
+		}
+		users, err := data.FetchRepoUsers(repoName, repoOwner, repoNameWithOwner)
 		if err != nil {
 			return RepoUsersFetchFailedMsg{Err: err}
 		}
@@ -1167,8 +1171,12 @@ func (m *Model) fetchUsers() tea.Cmd {
 // Use this for background fetching when entering commenting/approving modes
 func (m *Model) fetchUsersSilent() tea.Cmd {
 	return func() tea.Msg {
-		repoName := m.pr.Data.Primary.GetRepoNameWithOwner()
-		users, err := data.FetchRepoUsers(repoName)
+		repoNameWithOwner := m.pr.Data.Primary.GetRepoNameWithOwner()
+		repoOwner, repoName, ok := strings.Cut(repoNameWithOwner, "/")
+		if !ok {
+			return RepoUsersFetchFailedMsg{Err: fmt.Errorf("invalid repo name with owner: %q", repoNameWithOwner)}
+		}
+		users, err := data.FetchRepoUsers(repoName, repoOwner, repoNameWithOwner)
 		if err != nil {
 			return RepoUsersFetchFailedMsg{Err: err}
 		}
