@@ -853,11 +853,7 @@ func (m *Model) SetIsCommenting(isCommenting bool) tea.Cmd {
 	}
 
 	if !m.isCommenting && isCommenting {
-		m.inputBox.Reset()
-		m.ac.Reset() // Clear any stale autocomplete state (e.g., from labeling)
-
-		// Set up user mention autocomplete for commenting
-		m.inputBox.Autocompleter = strategies.UserMentionCompleter
+		repoautocomplete.SetupCommentEntry(&m.inputBox, m.ac)
 	}
 	m.isCommenting = isCommenting
 	m.inputBox.SetPrompt(constants.CommentPrompt)
@@ -867,12 +863,7 @@ func (m *Model) SetIsCommenting(isCommenting bool) tea.Cmd {
 		repoName := m.pr.Data.Primary.GetRepoNameWithOwner()
 		if users, ok := data.CachedRepoUsers(repoName); ok {
 			m.repoUsers = users
-			m.ac.SetSuggestions(repoautocomplete.UserSuggestions(users))
-			cursorPos := m.inputBox.CursorPosition()
-			mention, _, _ := strategies.UserMentionContextExtractor(m.inputBox.Value(), cursorPos)
-			if mention != "" {
-				m.ac.Show(mention, nil)
-			}
+			repoautocomplete.SeedUserMentionSuggestions(m.inputBox, m.ac, users)
 			return tea.Sequence(textarea.Blink, m.inputBox.Focus())
 		}
 		return tea.Sequence(m.fetchUsersSilent(), textarea.Blink, m.inputBox.Focus())
@@ -894,11 +885,7 @@ func (m *Model) SetIsApproving(isApproving bool) tea.Cmd {
 	}
 
 	if !m.isApproving && isApproving {
-		m.ac.Reset()
-		m.inputBox.Reset()
-
-		// Set up whitespace-based autocomplete for approving (users are whitespace-separated)
-		m.inputBox.Autocompleter = strategies.WhitespaceWordCompleter
+		repoautocomplete.SetupWhitespaceEntry(&m.inputBox, m.ac)
 	}
 	m.isApproving = isApproving
 	m.inputBox.SetPrompt(constants.ApprovalPrompt)
@@ -908,12 +895,7 @@ func (m *Model) SetIsApproving(isApproving bool) tea.Cmd {
 		repoName := m.pr.Data.Primary.GetRepoNameWithOwner()
 		if users, ok := data.CachedRepoUsers(repoName); ok {
 			m.repoUsers = users
-			m.ac.SetSuggestions(repoautocomplete.UserSuggestions(users))
-			// Show autocomplete immediately for current word at cursor
-			cursorPos := m.inputBox.CursorPosition()
-			currentWord, _, _ := strategies.WhitespaceContextExtractor(m.inputBox.Value(), cursorPos)
-			existingWords := strategies.WhitespaceItemsToExclude(m.inputBox.Value(), cursorPos)
-			m.ac.Show(currentWord, existingWords)
+			repoautocomplete.SeedWhitespaceSuggestions(m.inputBox, m.ac, users)
 			return tea.Sequence(textarea.Blink, m.inputBox.Focus())
 		}
 		// Fetch users asynchronously in background (no loading UI)
@@ -932,11 +914,7 @@ func (m *Model) SetIsAssigning(isAssigning bool) tea.Cmd {
 	}
 
 	if !m.isAssigning && isAssigning {
-		m.inputBox.Reset()
-		m.ac.Reset() // Clear any stale autocomplete state (e.g., from labeling)
-
-		// Set up whitespace-based autocomplete for assigning (users are whitespace-separated)
-		m.inputBox.Autocompleter = strategies.WhitespaceWordCompleter
+		repoautocomplete.SetupWhitespaceEntry(&m.inputBox, m.ac)
 	}
 	m.isAssigning = isAssigning
 	m.inputBox.SetPrompt(constants.AssignPrompt)
@@ -945,19 +923,13 @@ func (m *Model) SetIsAssigning(isAssigning bool) tea.Cmd {
 	}
 
 	// Reset autocomplete
-	m.ac.Hide()
-	m.ac.SetSuggestions(nil)
+	repoautocomplete.ResetSuggestions(m.ac)
 
 	if isAssigning {
 		repoName := m.pr.Data.Primary.GetRepoNameWithOwner()
 		if users, ok := data.CachedRepoUsers(repoName); ok {
 			m.repoUsers = users
-			m.ac.SetSuggestions(repoautocomplete.UserSuggestions(users))
-			// Show autocomplete immediately for current word at cursor
-			cursorPos := m.inputBox.CursorPosition()
-			currentWord, _, _ := strategies.WhitespaceContextExtractor(m.inputBox.Value(), cursorPos)
-			existingWords := strategies.WhitespaceItemsToExclude(m.inputBox.Value(), cursorPos)
-			m.ac.Show(currentWord, existingWords)
+			repoautocomplete.SeedWhitespaceSuggestions(m.inputBox, m.ac, users)
 			return tea.Sequence(textarea.Blink, m.inputBox.Focus())
 		}
 		// Fetch users asynchronously in background (no loading UI)
@@ -985,7 +957,7 @@ func (m *Model) SetIsUnassigning(isUnassigning bool) tea.Cmd {
 	}
 
 	if !m.isUnassigning && isUnassigning {
-		m.inputBox.Reset()
+		repoautocomplete.SetupUnassignEntry(&m.inputBox, m.ac, false)
 	}
 	m.isUnassigning = isUnassigning
 	m.inputBox.SetPrompt(constants.UnassignPrompt)
@@ -1043,10 +1015,7 @@ func (m *Model) SetIsLabeling(isLabeling bool) tea.Cmd {
 	}
 
 	if !m.isLabeling && isLabeling {
-		m.inputBox.Reset()
-
-		// Set up label autocomplete for labeling
-		m.inputBox.Autocompleter = strategies.LabelCompleter
+		repoautocomplete.SetupLabelEntry(&m.inputBox)
 	}
 	m.isLabeling = isLabeling
 	m.inputBox.SetPrompt(constants.LabelPrompt)
@@ -1056,12 +1025,10 @@ func (m *Model) SetIsLabeling(isLabeling bool) tea.Cmd {
 	for _, label := range m.pr.Data.Primary.Labels.Nodes {
 		labels = append(labels, label.Name)
 	}
-	labels = append(labels, "")
-	m.inputBox.SetValue(strings.Join(labels, ", "))
+	m.inputBox.SetValue(repoautocomplete.JoinedListWithTrailingEmpty(labels, ", "))
 
 	// Reset autocomplete
-	m.ac.Hide()
-	m.ac.SetSuggestions(nil)
+	repoautocomplete.ResetSuggestions(m.ac)
 
 	// Trigger label fetching for autocomplete
 	if isLabeling {
@@ -1069,11 +1036,7 @@ func (m *Model) SetIsLabeling(isLabeling bool) tea.Cmd {
 		if labels, ok := data.CachedRepoLabels(repoName); ok {
 			// Use cached labels
 			m.repoLabels = labels
-			m.ac.SetSuggestions(repoautocomplete.LabelSuggestions(labels))
-			cursorPos := m.inputBox.CursorPosition()
-			currentLabel, _, _ := strategies.LabelContextExtractor(m.inputBox.Value(), cursorPos)
-			existingLabels := strategies.LabelItemsToExclude(m.inputBox.Value(), cursorPos)
-			m.ac.Show(currentLabel, existingLabels)
+			repoautocomplete.SeedLabelSuggestions(m.inputBox, m.ac, labels)
 			return tea.Sequence(textarea.Blink, m.inputBox.Focus())
 		} else {
 			// Fetch labels asynchronously

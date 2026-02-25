@@ -8,6 +8,8 @@ import (
 
 	"github.com/dlvhdr/gh-dash/v4/internal/data"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/autocomplete"
+	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/inputbox"
+	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/inputbox/strategies"
 )
 
 type RepoLabelsFetchedMsg struct {
@@ -78,4 +80,67 @@ func FetchUsers(repoNameWithOwner string, ac *autocomplete.Model, withSpinner bo
 
 	spinnerTickCmd := ac.SetFetchLoading()
 	return tea.Batch(spinnerTickCmd, fetchCmd)
+}
+
+func SetupCommentEntry(inputBox *inputbox.Model, ac *autocomplete.Model) {
+	inputBox.Reset()
+	ac.Reset()
+	inputBox.Autocompleter = strategies.UserMentionCompleter
+}
+
+func SetupWhitespaceEntry(inputBox *inputbox.Model, ac *autocomplete.Model) {
+	inputBox.Reset()
+	ac.Reset()
+	inputBox.Autocompleter = strategies.WhitespaceWordCompleter
+}
+
+func SetupLabelEntry(inputBox *inputbox.Model) {
+	inputBox.Reset()
+	inputBox.Autocompleter = strategies.LabelCompleter
+}
+
+func SetupUnassignEntry(inputBox *inputbox.Model, ac *autocomplete.Model, resetAutocomplete bool) {
+	inputBox.Reset()
+	if resetAutocomplete {
+		ac.Reset()
+	}
+}
+
+func ResetSuggestions(ac *autocomplete.Model) {
+	ac.Hide()
+	ac.SetSuggestions(nil)
+}
+
+func SeedUserMentionSuggestions(inputBox inputbox.Model, ac *autocomplete.Model, users []data.User) {
+	ac.SetSuggestions(UserSuggestions(users))
+
+	cursorPos := inputBox.CursorPosition()
+	mention, _, _ := strategies.UserMentionContextExtractor(inputBox.Value(), cursorPos)
+	if mention != "" {
+		ac.Show(mention, nil)
+	}
+}
+
+func SeedWhitespaceSuggestions(inputBox inputbox.Model, ac *autocomplete.Model, users []data.User) {
+	ac.SetSuggestions(UserSuggestions(users))
+
+	cursorPos := inputBox.CursorPosition()
+	currentWord, _, _ := strategies.WhitespaceContextExtractor(inputBox.Value(), cursorPos)
+	existingWords := strategies.WhitespaceItemsToExclude(inputBox.Value(), cursorPos)
+	ac.Show(currentWord, existingWords)
+}
+
+func SeedLabelSuggestions(inputBox inputbox.Model, ac *autocomplete.Model, labels []data.Label) {
+	ac.SetSuggestions(LabelSuggestions(labels))
+
+	cursorPos := inputBox.CursorPosition()
+	currentLabel, _, _ := strategies.LabelContextExtractor(inputBox.Value(), cursorPos)
+	existingLabels := strategies.LabelItemsToExclude(inputBox.Value(), cursorPos)
+	ac.Show(currentLabel, existingLabels)
+}
+
+func JoinedListWithTrailingEmpty(items []string, sep string) string {
+	values := append([]string{}, items...)
+	values = append(values, "")
+	return strings.Join(values, sep)
 }
