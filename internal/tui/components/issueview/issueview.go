@@ -522,8 +522,9 @@ func (m *Model) SetIsAssigning(isAssigning bool) tea.Cmd {
 		if users, ok := data.CachedRepoUsers(repoName); ok {
 			m.repoUsers = users
 			repoautocomplete.SeedWhitespaceSuggestions(m.inputBox, m.ac, users)
-			return tea.Sequence(m.fetchUsers(), textarea.Blink, m.inputBox.Focus())
+			return tea.Sequence(textarea.Blink, m.inputBox.Focus())
 		}
+		return tea.Sequence(m.fetchUsers(), textarea.Blink, m.inputBox.Focus())
 	}
 	return nil
 }
