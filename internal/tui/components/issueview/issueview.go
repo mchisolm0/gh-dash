@@ -344,9 +344,9 @@ func (m Model) View() string {
 	s.WriteString("\n\n")
 	s.WriteString(m.renderActivity())
 
-	if m.isCommenting || m.isLabeling {
+	if m.isCommenting || m.isLabeling || m.isAssigning {
 		s.WriteString(m.inputBox.ViewWithAutocomplete())
-	} else if m.isAssigning || m.isUnassigning {
+	} else if m.isUnassigning {
 		s.WriteString(m.inputBox.View())
 	}
 
