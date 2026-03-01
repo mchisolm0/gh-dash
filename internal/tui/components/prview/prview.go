@@ -348,9 +348,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			switch msg.Type {
 			case tea.KeyCtrlD:
 				labels := strategies.CurrentLabels(m.inputBox.Value())
-				if len(labels) > 0 {
-					cmd = m.label(labels)
-				}
+				cmd = m.label(labels)
 				m.inputBox.Blur()
 				m.isLabeling = false
 				m.ac.Hide()
@@ -1076,10 +1074,45 @@ func (m *Model) prLabels() []string {
 func (m *Model) label(labels []string) tea.Cmd {
 	prNumber := m.pr.Data.Primary.GetNumber()
 	repoName := m.pr.Data.Primary.GetRepoNameWithOwner()
+	existingLabels := m.prLabels()
+
+	existingLabelSet := make(map[string]struct{}, len(existingLabels))
+	for _, existingLabel := range existingLabels {
+		existingLabelSet[existingLabel] = struct{}{}
+	}
+
+	finalLabelSet := make(map[string]struct{}, len(labels))
+	for _, label := range labels {
+		finalLabelSet[label] = struct{}{}
+	}
+
+	labelsToAdd := make([]string, 0)
+	for _, label := range labels {
+		if _, exists := existingLabelSet[label]; !exists {
+			labelsToAdd = append(labelsToAdd, label)
+		}
+	}
+
+	labelsToRemove := make([]string, 0)
+	for _, existingLabel := range existingLabels {
+		if _, keep := finalLabelSet[existingLabel]; !keep {
+			labelsToRemove = append(labelsToRemove, existingLabel)
+		}
+	}
+
+	args := []string{"pr", "edit", fmt.Sprintf("%d", prNumber), "-R", repoName}
+	for _, label := range labelsToAdd {
+		args = append(args, "--add-label", label)
+	}
+	for _, label := range labelsToRemove {
+		args = append(args, "--remove-label", label)
+	}
 
 	cmd := func() tea.Msg {
-		cmd := exec.Command("gh", "pr", "edit", fmt.Sprintf("%d", prNumber),
-			"-R", repoName, "--add-label", strings.Join(labels, ","))
+		if len(labelsToAdd) == 0 && len(labelsToRemove) == 0 {
+			return PrLabeledMsg{}
+		}
+		cmd := exec.Command("gh", args...)
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			return PrActionErrorMsg{Err: fmt.Errorf("failed to label PR: %s", string(output))}
